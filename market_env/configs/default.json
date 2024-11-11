@@ -1,0 +1,12 @@
+{
+    "environment": {
+        "window_size": 10,
+        "currencies": ["USD", "EUR", "BTC", "ETH"],
+        "base_currency": "USD",
+        "starting_balance": 100000.0,
+        "fees": 0.00075,
+        "interval": 1,
+        "instrument_names": ["BTCUSD", "ETHUSD", "EURUSD"],
+        "max_episode_length": 1000
+    }
+}

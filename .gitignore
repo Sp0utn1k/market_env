@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*.h5
+*.log
+*.pickle
+.DS_Store
+.env
+data/
