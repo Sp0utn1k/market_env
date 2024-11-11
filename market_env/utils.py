@@ -8,6 +8,13 @@ from typing import Dict, List, Tuple
 from collections import deque
 
 
+# List of known base currencies
+BASE_CURRENCIES = [
+    'BTC', 'USD', 'EUR', 'USDT', 'ETH', 'AUD', 'GBP', 'CHF', 'CAD',
+    'USDC', 'JPY', 'DAI', 'AED', '.SETH'
+]
+
+
 def compute_exchange_rates(base_currency: str, currency_pairs: Dict[Tuple[str, str], float]) -> Dict[str, float]:
     """
     Computes exchange rates from various currencies to the base currency.
@@ -66,10 +73,15 @@ def parse_instrument_name(name: str) -> Tuple[str, str]:
     Returns:
         Tuple[str, str]: (quote_currency, base_currency)
     """
+    # Check if name contains a dot notation
     if '.' in name:
         return tuple(name.split('.'))
-    else:
-        # Assuming base currency is last 3 characters
-        quote_currency = name[:-3]
-        base_currency = name[-3:]
-        return quote_currency, base_currency
+
+    # Try to match known base currencies at the end of the name
+    for base_currency in sorted(BASE_CURRENCIES, key=len, reverse=True):
+        if name.endswith(base_currency):
+            quote_currency = name[:-len(base_currency)]
+            return quote_currency, base_currency
+
+    # If no known base currency is found, raise an error
+    raise ValueError(f"Cannot parse instrument name '{name}'. Unknown base currency.")

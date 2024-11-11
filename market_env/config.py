@@ -22,12 +22,19 @@ class Config:
 
     def _load_config(self, config_name: str) -> dict:
         """Loads a JSON configuration file."""
-        package_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(package_dir, 'configs', f'{config_name}.json')
-        if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Configuration file {config_name}.json not found in configs directory.")
-        with open(config_path, 'r') as file:
-            return json.load(file)
+        try:
+            package_dir = os.path.dirname(os.path.abspath(__file__))
+            config_path = os.path.join(package_dir, 'configs', f'{config_name}.json')
+            if not os.path.exists(config_path):
+                raise FileNotFoundError(f"Configuration file '{config_name}.json' not found in configs directory.")
+            with open(config_path, 'r') as file:
+                return json.load(file)
+        except FileNotFoundError as e:
+            raise FileNotFoundError(str(e))
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Error parsing JSON configuration file '{config_name}.json': {e}")
+        except Exception as e:
+            raise Exception(f"An error occurred while loading the configuration file '{config_name}.json': {e}")
 
     def get(self, key: str, default=None):
         """Retrieves a configuration value."""

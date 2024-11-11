@@ -134,3 +134,8 @@ def get_available_instruments(interval: int = None) -> List[str]:
             continue  # Skip if interval doesn't match
         instruments.add(instrument_name)
     return list(instruments)
+
+if __name__ == '__main__':
+    instruments = get_available_instruments(interval=1)
+    print(instruments)
+    

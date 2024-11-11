@@ -131,14 +131,74 @@ class MarketEnv(gym.Env):
         return observation, reward, done, info
 
     def _execute_actions(self, actions: List[float]):
-        """Executes the agent's actions."""
-        rates = {instr.base_currency: {} for instr in self.instruments}
-        for idx, (action_value, instrument) in enumerate(zip(actions, self.instruments)):
-            rate = instrument.get_rate(self.current_step)
-            from_currency = instrument.base_currency if action_value >= 0 else instrument.quote_currency
-            to_currency = instrument.quote_currency if action_value >= 0 else instrument.base_currency
-            amount = abs(action_value) * self.wallet.balances.get(from_currency, 0)
-            self.wallet.execute_transaction(from_currency, to_currency, amount, rate)
+        """Executes the agent's actions, ensuring that total sold amounts do not exceed wallet balances."""
+        action_details = self._compute_action_details(actions)
+        from_currency_totals = self._calculate_total_sold_amounts(action_details)
+        adjusted_action_details = self._adjust_action_amounts(action_details, from_currency_totals)
+        self._apply_actions(adjusted_action_details)
+
+    def _compute_action_details(self, actions: List[float]) -> List[dict]:
+        """Computes action details including amounts to be traded."""
+        action_details = []
+        for action_value, instrument in zip(actions, self.instruments):
+            if action_value == 0:
+                continue  # No action
+            from_currency, to_currency, amount, rate = self._get_trade_parameters(action_value, instrument)
+            action_details.append({
+                'from_currency': from_currency,
+                'to_currency': to_currency,
+                'amount': amount,
+                'rate': rate
+            })
+        return action_details
+
+    def _get_trade_parameters(self, action_value: float, instrument: Instrument):
+        """Determines the currencies involved, amount to trade, and exchange rate."""
+        rate = instrument.get_rate(self.current_step)
+        if action_value > 0:
+            from_currency = instrument.base_currency
+            to_currency = instrument.quote_currency
+            balance = self.wallet.balances.get(from_currency, 0)
+            amount = action_value * balance
+        else:
+            from_currency = instrument.quote_currency
+            to_currency = instrument.base_currency
+            balance = self.wallet.balances.get(from_currency, 0)
+            amount = -action_value * balance
+        return from_currency, to_currency, amount, rate
+
+    def _calculate_total_sold_amounts(self, action_details: List[dict]) -> Dict[str, float]:
+        """Calculates the total amounts to be sold per currency."""
+        from_currency_totals = {}
+        for action in action_details:
+            from_currency = action['from_currency']
+            amount = action['amount']
+            from_currency_totals[from_currency] = from_currency_totals.get(from_currency, 0) + amount
+        return from_currency_totals
+
+    def _adjust_action_amounts(self, action_details: List[dict], from_currency_totals: Dict[str, float]) -> List[dict]:
+        """Adjusts action amounts if total sold exceeds balance."""
+        adjusted_actions = []
+        for action in action_details:
+            from_currency = action['from_currency']
+            total_sold = from_currency_totals[from_currency]
+            balance = self.wallet.balances.get(from_currency, 0)
+            if total_sold > balance:
+                scale_factor = balance / total_sold
+                action['amount'] *= scale_factor
+            adjusted_actions.append(action)
+        return adjusted_actions
+
+    def _apply_actions(self, action_details: List[dict]):
+        """Applies the adjusted actions to the wallet."""
+        for action in action_details:
+            self.wallet.execute_transaction(
+                action['from_currency'],
+                action['to_currency'],
+                action['amount'],
+                action['rate']
+            )
+
 
     def _get_observation(self) -> np.ndarray:
         """Retrieves the current observation."""
