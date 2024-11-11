@@ -46,6 +46,9 @@ def load_instrument_data(
 
     if fill_missing:
         data = _fill_missing_data(data, interval)
+
+    print(f"Sample data for {instrument_name}:")
+    print(data[['time', 'close']].head())
     return data
 
 
@@ -106,9 +109,11 @@ def _fill_missing_data(data: pd.DataFrame, interval: int) -> pd.DataFrame:
     full_time_range = np.arange(data['time'].min(), data['time'].max() + interval * 60, interval * 60)
     df_full = pd.DataFrame({'time': full_time_range})
     df_full = df_full.merge(data, on='time', how='left')
-    df_full[['open', 'high', 'low', 'close']] = df_full[['open', 'high', 'low', 'close']].fillna(method='ffill')
+    # Use ffill() instead of fillna(method='ffill')
+    df_full[['open', 'high', 'low', 'close']] = df_full[['open', 'high', 'low', 'close']].ffill()
     df_full[['volume', 'trades']] = df_full[['volume', 'trades']].fillna(0)
     return df_full
+
 
 def get_available_instruments(interval: int = None) -> List[str]:
     """
@@ -138,4 +143,3 @@ def get_available_instruments(interval: int = None) -> List[str]:
 if __name__ == '__main__':
     instruments = get_available_instruments(interval=1)
     print(instruments)
-    

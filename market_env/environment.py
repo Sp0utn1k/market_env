@@ -9,7 +9,7 @@ from gymnasium import spaces
 import numpy as np
 import os
 import pandas as pd
-from typing import List
+from typing import List, Dict
 from .wallet import Wallet
 from .instrument import Instrument
 from .data_loader import load_multiple_instruments, synchronize_data, load_instrument_data
@@ -52,21 +52,24 @@ class MarketEnv(gym.Env):
         # Load and initialize instruments
         instrument_names = self._select_instruments()
         datasets = load_multiple_instruments(instrument_names, interval=self.config['interval'])
-        datasets = synchronize_data(datasets)
-        self.instruments = []
-        print("Loaded Instruments:")
+        print("Loaded Instruments (before synchronization):")
         for name in instrument_names:
             data = datasets[name]
-            instrument = Instrument(name, data)
-            self.instruments.append(instrument)
-            quote_currency = instrument.quote_currency
-            base_currency = instrument.base_currency
+            quote_currency, base_currency = parse_instrument_name(name)
             start_time = pd.to_datetime(data['time'].iloc[0], unit='s')
             end_time = pd.to_datetime(data['time'].iloc[-1], unit='s')
             print(f"Instrument: {name}, Base: {base_currency}, Quote: {quote_currency}, "
                   f"Start: {start_time}, End: {end_time}")
+        datasets = synchronize_data(datasets)
+        print("Data synchronized.")
+        self.instruments = []
+        for name in instrument_names:
+            data = datasets[name]
+            instrument = Instrument(name, data)
+            self.instruments.append(instrument)
         self.data_length = len(self.instruments[0].data)
         self.current_step = self.window_size - 1
+
 
     def _select_instruments(self) -> List[str]:
         """
@@ -144,6 +147,8 @@ class MarketEnv(gym.Env):
             if action_value == 0:
                 continue  # No action
             from_currency, to_currency, amount, rate = self._get_trade_parameters(action_value, instrument)
+            if amount <= 0:
+                continue  # Skip actions with zero or negative amount
             action_details.append({
                 'from_currency': from_currency,
                 'to_currency': to_currency,
@@ -160,11 +165,16 @@ class MarketEnv(gym.Env):
             to_currency = instrument.quote_currency
             balance = self.wallet.balances.get(from_currency, 0)
             amount = action_value * balance
+            print(f"Buying {to_currency} with {from_currency}")
+            print(f"Rate: {rate}, Amount: {amount}")
         else:
             from_currency = instrument.quote_currency
             to_currency = instrument.base_currency
             balance = self.wallet.balances.get(from_currency, 0)
             amount = -action_value * balance
+            rate = 1 / rate  # Invert the rate when selling
+            print(f"Selling {from_currency} for {to_currency}")
+            print(f"Inverted Rate: {rate}, Amount: {amount}")
         return from_currency, to_currency, amount, rate
 
     def _calculate_total_sold_amounts(self, action_details: List[dict]) -> Dict[str, float]:
@@ -192,13 +202,14 @@ class MarketEnv(gym.Env):
     def _apply_actions(self, action_details: List[dict]):
         """Applies the adjusted actions to the wallet."""
         for action in action_details:
+            print(f"Executing Transaction: {action}")
             self.wallet.execute_transaction(
                 action['from_currency'],
                 action['to_currency'],
                 action['amount'],
                 action['rate']
             )
-
+            print(f"Balances after transaction: {self.wallet.balances}")
 
     def _get_observation(self) -> np.ndarray:
         """Retrieves the current observation."""

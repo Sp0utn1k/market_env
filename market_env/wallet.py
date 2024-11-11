@@ -54,6 +54,11 @@ class Wallet:
         self.balances[from_currency] -= amount
         self.balances[to_currency] = self.balances.get(to_currency, 0) + converted_amount
 
+        # Ensure balances are standard floats
+        self.balances[from_currency] = float(self.balances[from_currency])
+        self.balances[to_currency] = float(self.balances[to_currency])
+
+
     def get_total_value(self, rates: Dict[str, float], base_currency: str) -> float:
         """
         Calculates the total wallet value in the base currency.
