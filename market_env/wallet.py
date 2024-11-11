@@ -49,7 +49,7 @@ class Wallet:
 
         fee = amount * self.fees
         net_amount = amount - fee
-        converted_amount = net_amount * rate
+        converted_amount = net_amount / rate
 
         self.balances[from_currency] -= amount
         self.balances[to_currency] = self.balances.get(to_currency, 0) + converted_amount

@@ -10,6 +10,8 @@ import numpy as np
 import os
 import pandas as pd
 from typing import List, Dict
+import random
+
 from .wallet import Wallet
 from .instrument import Instrument
 from .data_loader import load_multiple_instruments, synchronize_data, load_instrument_data
@@ -68,8 +70,6 @@ class MarketEnv(gym.Env):
             instrument = Instrument(name, data)
             self.instruments.append(instrument)
         self.data_length = len(self.instruments[0].data)
-        self.current_step = self.window_size - 1
-
 
     def _select_instruments(self) -> List[str]:
         """
@@ -107,7 +107,7 @@ class MarketEnv(gym.Env):
     def reset(self):
         """Resets the environment to the initial state."""
         self.wallet.reset()
-        self.current_step = self.window_size - 1
+        self.current_step = random.randrange(self.window_size - 1, self.data_length - self.window_size)
         self.previous_value = self.starting_balance
         return self._get_observation(), {}
 
@@ -157,7 +157,7 @@ class MarketEnv(gym.Env):
             })
         return action_details
 
-    def _get_trade_parameters(self, action_value: float, instrument: Instrument):
+    def _get_trade_parameters(self, action_value: float, instrument: Instrument, debug: bool = False):
         """Determines the currencies involved, amount to trade, and exchange rate."""
         rate = instrument.get_rate(self.current_step)
         if action_value > 0:
@@ -165,16 +165,18 @@ class MarketEnv(gym.Env):
             to_currency = instrument.quote_currency
             balance = self.wallet.balances.get(from_currency, 0)
             amount = action_value * balance
-            print(f"Buying {to_currency} with {from_currency}")
-            print(f"Rate: {rate}, Amount: {amount}")
+            if debug:
+                print(f"Buying {to_currency} with {from_currency}")
+                print(f"Rate: {rate}, Amount: {amount}")
         else:
             from_currency = instrument.quote_currency
             to_currency = instrument.base_currency
             balance = self.wallet.balances.get(from_currency, 0)
             amount = -action_value * balance
             rate = 1 / rate  # Invert the rate when selling
-            print(f"Selling {from_currency} for {to_currency}")
-            print(f"Inverted Rate: {rate}, Amount: {amount}")
+            if debug:
+                print(f"Selling {from_currency} for {to_currency}")
+                print(f"Inverted Rate: {rate}, Amount: {amount}")
         return from_currency, to_currency, amount, rate
 
     def _calculate_total_sold_amounts(self, action_details: List[dict]) -> Dict[str, float]:
@@ -199,17 +201,19 @@ class MarketEnv(gym.Env):
             adjusted_actions.append(action)
         return adjusted_actions
 
-    def _apply_actions(self, action_details: List[dict]):
+    def _apply_actions(self, action_details: List[dict], debug: bool = False):
         """Applies the adjusted actions to the wallet."""
         for action in action_details:
-            print(f"Executing Transaction: {action}")
+            if debug:
+                print(f"Executing Transaction: {action}")
             self.wallet.execute_transaction(
                 action['from_currency'],
                 action['to_currency'],
                 action['amount'],
                 action['rate']
             )
-            print(f"Balances after transaction: {self.wallet.balances}")
+            if debug:
+                print(f"Balances after transaction: {self.wallet.balances}")
 
     def _get_observation(self) -> np.ndarray:
         """Retrieves the current observation."""
@@ -221,11 +225,13 @@ class MarketEnv(gym.Env):
 
     def _compute_reward(self) -> float:
         """Computes the reward for the current step."""
-        exchange_rates = {}
+        currency_pairs = {}
         for instrument in self.instruments:
+            quote_currency = instrument.quote_currency
+            base_currency = instrument.base_currency
             rate = instrument.get_rate(self.current_step)
-            exchange_rates[instrument.quote_currency] = rate
-            exchange_rates[instrument.base_currency] = 1 / rate
+            currency_pairs[(base_currency, quote_currency)] = rate
+        exchange_rates = compute_exchange_rates(self.base_currency, currency_pairs)
         total_value = self.wallet.get_total_value(exchange_rates, self.base_currency)
         reward = total_value - self.previous_value
         self.previous_value = total_value

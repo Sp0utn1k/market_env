@@ -37,7 +37,6 @@ for step in range(num_steps):
     actions = np.array(actions)
     observation, reward, done, info = env.step(actions)
     env.render()
-    print("Wallet Balances:", env.wallet.balances)
     print("Reward:", reward)
     if done:
         break

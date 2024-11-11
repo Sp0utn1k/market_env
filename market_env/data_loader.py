@@ -14,7 +14,8 @@ from joblib import Parallel, delayed
 def load_instrument_data(
     instrument_name: str,
     interval: int = 1,
-    fill_missing: bool = True
+    fill_missing: bool = True,
+    print_sample: bool = False
 ) -> pd.DataFrame:
     """
     Loads data for a single instrument.
@@ -47,8 +48,9 @@ def load_instrument_data(
     if fill_missing:
         data = _fill_missing_data(data, interval)
 
-    print(f"Sample data for {instrument_name}:")
-    print(data[['time', 'close']].head())
+    if print_sample:
+        print(f"Sample data for {instrument_name}:")
+        print(data[['time', 'close']].head())
     return data
 
 
