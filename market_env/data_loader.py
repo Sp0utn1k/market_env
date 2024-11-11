@@ -26,11 +26,24 @@ def load_instrument_data(
 
     Returns:
         pd.DataFrame: DataFrame containing the instrument's data.
+
+    Raises:
+        FileNotFoundError: If the data file does not exist.
+        ValueError: If the data file is empty or corrupted.
     """
     data_dir = os.path.join(os.path.dirname(__file__), 'data')
     file_path = os.path.join(data_dir, f"{instrument_name}_{interval}.csv")
     columns = ["time", "open", "high", "low", "close", "volume", "trades"]
-    data = pd.read_csv(file_path, header=None, names=columns, skiprows=1)
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Data file for instrument {instrument_name} with interval {interval} not found.")
+
+    try:
+        data = pd.read_csv(file_path, header=None, names=columns, skiprows=1)
+        if data.empty:
+            raise ValueError(f"Data file {file_path} is empty.")
+    except Exception as e:
+        raise ValueError(f"Error reading data file {file_path}: {e}")
+
     if fill_missing:
         data = _fill_missing_data(data, interval)
     return data
@@ -96,3 +109,28 @@ def _fill_missing_data(data: pd.DataFrame, interval: int) -> pd.DataFrame:
     df_full[['open', 'high', 'low', 'close']] = df_full[['open', 'high', 'low', 'close']].fillna(method='ffill')
     df_full[['volume', 'trades']] = df_full[['volume', 'trades']].fillna(0)
     return df_full
+
+def get_available_instruments(interval: int = None) -> List[str]:
+    """
+    Returns a list of available instrument names.
+
+    Args:
+        interval (int, optional): Time interval in minutes. If specified, only instruments with this interval are returned.
+
+    Returns:
+        List[str]: List of available instrument names.
+    """
+    data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    instrument_files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
+    instruments = set()
+
+    for file_name in instrument_files:
+        parts = file_name.split('_')
+        if len(parts) != 2:
+            continue  # Unexpected file name format
+        instrument_name, file_interval = parts
+        file_interval = file_interval.replace('.csv', '')
+        if interval is not None and int(file_interval) != interval:
+            continue  # Skip if interval doesn't match
+        instruments.add(instrument_name)
+    return list(instruments)
