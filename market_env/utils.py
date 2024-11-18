@@ -11,7 +11,7 @@ from collections import deque
 # List of known base currencies
 BASE_CURRENCIES = [
     'BTC', 'USD', 'EUR', 'USDT', 'ETH', 'AUD', 'GBP', 'CHF', 'CAD',
-    'USDC', 'JPY', 'DAI', 'AED', '.SETH'
+    'USDC', 'JPY', 'DAI', 'AED', '.SETH', 'XBT', 'POL', 'DOT'
 ]
 
 

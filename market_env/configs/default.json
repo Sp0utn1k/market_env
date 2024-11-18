@@ -1,12 +1,15 @@
 {
     "environment": {
-        "window_size": 10,
+        "window_size": 100,
         "currencies": ["USD", "EUR", "BTC", "ETH"],
-        "base_currency": "USD",
+        "usable_instruments": ["BTCEUR", "ETHBTC", "ETHEUR"],
+        "base_currency": "EUR",
         "starting_balance": 100000.0,
         "fees": 0.00075,
         "interval": 1,
         "ignore_instruments": [],
-        "max_episode_length": 1000
+        "episode_length": 200,
+        "discretize": true,
+        "discrete_actions": [-1, -0.1, 0, 0.1, 1]
     }
 }

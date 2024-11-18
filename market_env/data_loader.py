@@ -13,9 +13,12 @@ from joblib import Parallel, delayed
 
 def load_instrument_data(
     instrument_name: str,
+    cols: List[str],
     interval: int = 1,
     fill_missing: bool = True,
-    print_sample: bool = False
+    dtype: str = 'float32',
+    print_sample: bool = False,
+    nrows: int = 0
 ) -> pd.DataFrame:
     """
     Loads data for a single instrument.
@@ -48,16 +51,23 @@ def load_instrument_data(
     if fill_missing:
         data = _fill_missing_data(data, interval)
 
+    data = _preprocess_data(data, cols)
+
+    data = convert_to_type(data, dtype)
     if print_sample:
         print(f"Sample data for {instrument_name}:")
-        print(data[['time', 'close']].head())
+        print(data.head())
     return data
 
 
 def load_multiple_instruments(
     instrument_names: List[str],
+    cols: List[str],
     interval: int = 1,
     fill_missing: bool = True,
+    dtype: str = 'float32',
+    print_sample: bool = False,
+    nrows: int = 0,
     n_jobs: int = -1
 ) -> Dict[str, pd.DataFrame]:
     """
@@ -73,7 +83,7 @@ def load_multiple_instruments(
         Dict[str, pd.DataFrame]: Dictionary mapping instrument names to their data.
     """
     results = Parallel(n_jobs=n_jobs)(
-        delayed(load_instrument_data)(name, interval, fill_missing) for name in instrument_names
+        delayed(load_instrument_data)(name, cols, interval=interval, fill_missing=fill_missing, dtype=dtype, print_sample=print_sample, nrows=nrows) for name in instrument_names
     )
     return dict(zip(instrument_names, results))
 
@@ -94,6 +104,7 @@ def synchronize_data(datasets: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFram
     for name, df in datasets.items():
         mask = (df['time'] >= start_time) & (df['time'] <= end_time)
         synchronized[name] = df.loc[mask].reset_index(drop=True)
+
     return synchronized
 
 
@@ -116,6 +127,44 @@ def _fill_missing_data(data: pd.DataFrame, interval: int) -> pd.DataFrame:
     df_full[['volume', 'trades']] = df_full[['volume', 'trades']].fillna(0)
     return df_full
 
+def _preprocess_data(df, cols):
+
+    df['datetime'] = pd.to_datetime(df['time'], unit='s')
+    
+    for col in cols:
+        match col:
+            # Time data
+            case 'year':
+                df['year'] = df['datetime'].dt.year
+            case 'year_scaled':
+                df['year_scaled'] = (df['datetime'].dt.year - 2001) / 20
+            case 'day_of_year':
+                df['day_of_year'] = df['datetime'].dt.dayofyear
+            case 'day_of_week':
+                df['day_of_week'] = df['datetime'].dt.dayofweek
+            case 'sin_hour':
+                df['sin_hour'] = np.sin(2 * np.pi * df['datetime'].dt.hour / 24)
+            case 'cos_hour':
+                df['cos_hour'] = np.cos(2 * np.pi * df['datetime'].dt.hour / 24)
+            case 'sin_min':
+                df['sin_min'] = np.sin(2 * np.pi * df['datetime'].dt.minute / 60)
+            case 'cos_min':
+                df['cos_min'] = np.cos(2 * np.pi * df['datetime'].dt.minute / 60)
+
+            # Trading data
+            case 'volume_log':
+                df['volume_log'] = np.log(df['volume'] + 1)
+            case 'trades_log':
+                df['trades_log'] = np.log(df['trades'] + 1)
+
+    # for col in ['open', 'high', 'low', 'close']:
+    #     df[f'{col}_log_return'] = np.log(df[col] / df[col].shift(1)).fillna(0)
+    
+    
+    
+    df = df.drop(columns=['datetime'])
+    
+    return df[['time']+cols]
 
 def get_available_instruments(interval: int = None) -> List[str]:
     """
@@ -145,3 +194,10 @@ def get_available_instruments(interval: int = None) -> List[str]:
 if __name__ == '__main__':
     instruments = get_available_instruments(interval=1)
     print(instruments)
+
+def convert_to_type(df, type):
+    # Convert all columns except 'time' to float32
+    for col in df.columns:
+        if col != 'time':
+            df[col] = df[col].astype(type)
+    return df

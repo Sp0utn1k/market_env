@@ -35,7 +35,7 @@ class Instrument:
             # Assuming the base currency is the last 3 characters
             return self.name[:-3], self.name[-3:]
 
-    def get_rate(self, index: int) -> float:
+    def get_rate(self, index: int, debug: bool = False) -> float:
         """
         Retrieves the exchange rate at a specific index.
 
@@ -45,9 +45,11 @@ class Instrument:
         Returns:
             float: Exchange rate (closing price).
         """
+        if debug:
+            print(f'Getting rate at index {index}')
         return self.data.iloc[index]['close']
 
-    def get_history(self, index: int, window: int) -> pd.DataFrame:
+    def get_history(self, index: int, window: int, debug: bool = False, cols=None) -> pd.DataFrame:
         """
         Retrieves historical data up to a specific index.
 
@@ -58,6 +60,32 @@ class Instrument:
         Returns:
             pd.DataFrame: Historical data window.
         """
-        if index - window + 1 < 0:
+        if debug:
+            print(f'Getting history between {index-window+1} and {index}')
+        if cols:
+            data = self.data[cols]
+        else:
+            data = self.data
+        if index - window +1 < 0:
             raise IndexError("Index out of bounds for the historical window.")
-        return self.data.iloc[index - window + 1:index + 1].reset_index(drop=True)
+        return data.iloc[index - window + 1:index+1].reset_index(drop=True)
+
+    def get_last(self, index: int, cols=None) -> pd.DataFrame:
+        """
+        Retrieves historical data up to a specific index.
+
+        Args:
+            index (int): Current index in the data DataFrame.
+            window (int): Number of past data points to retrieve.
+
+        Returns:
+            pd.DataFrame: Historical data window.
+        """
+        if cols:
+            data = self.data[cols]
+        else:
+            data = self.data
+            
+        return data.iloc[index].reset_index(drop=True)
+
+    
